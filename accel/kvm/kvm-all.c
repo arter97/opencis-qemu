@@ -2903,6 +2903,7 @@ int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
     int ret, run_ret;
+    int64_t start, end;
 
     DPRINTF("kvm_cpu_exec()\n");
 
@@ -2938,7 +2939,10 @@ int kvm_cpu_exec(CPUState *cpu)
          */
         smp_rmb();
 
+        start = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
+        end = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
+        trace_kvm_guest_took(end - start);
 
         attrs = kvm_arch_post_run(cpu, run);
 
