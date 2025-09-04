@@ -145,6 +145,7 @@ static PCIDevice *cxl_cfmws_find_device(CXLFixedWindow *fw, hwaddr addr)
     rb_index = (addr / cxl_decode_ig(fw->enc_int_gran)) % fw->num_targets;
     hb = PCI_HOST_BRIDGE(fw->target_hbs[rb_index]->cxl.cxl_host_bridge);
     if (!hb || !hb->bus || !pci_bus_is_cxl(hb->bus)) {
+        trace_cxl_debug_message("CXL host bridge not found");
         return NULL;
     }
 
@@ -166,11 +167,14 @@ static PCIDevice *cxl_cfmws_find_device(CXLFixedWindow *fw, hwaddr addr)
 
         target_found = cxl_hdm_find_target(cache_mem, addr, &target);
         if (!target_found) {
+            trace_cxl_debug_message("CXL hdm target not found");
             return NULL;
         }
+        // trace_cxl_debug_hdm_target("CXL hdm target", target);
 
         rp = pcie_find_port_by_pn(hb->bus, target);
         if (!rp) {
+            trace_cxl_debug_message("CXL port not found");
             return NULL;
         }
     }
@@ -182,6 +186,7 @@ static PCIDevice *cxl_cfmws_find_device(CXLFixedWindow *fw, hwaddr addr)
 
     d = pci_bridge_get_sec_bus(PCI_BRIDGE(rp))->devices[0];
     if (!d) {
+        trace_cxl_debug_message("CXL secondary bus not found");
         return NULL;
     }
 
@@ -196,6 +201,8 @@ static PCIDevice *cxl_cfmws_find_device(CXLFixedWindow *fw, hwaddr addr)
     if (object_dynamic_cast(OBJECT(d), TYPE_CXL_TYPE1)) {
         return d;
     }
+
+    trace_cxl_debug_message("No valid cast candidate found");
 
     return NULL;
 }
