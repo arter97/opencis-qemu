@@ -399,7 +399,7 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
                                     uint8_t *data, unsigned size,
                                     MemTxAttrs attrs);
 MemTxResult cxl_remote_cxl_mem_write_with_cache(PCIDevice *d, hwaddr host_addr,
-                                                uint64_t data, unsigned size,
+                                                uint8_t *data, unsigned size,
                                                 MemTxAttrs attrs);
 MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
                                      uint8_t *data, unsigned size,

@@ -28,7 +28,7 @@ static MemTxResult __host_hcoh_access(CacheCommand cmd, PCIDevice *d,
 {
     CacheState cache_state;
     MemTxResult rsp;
-    uint64_t assem_addr, tag, set;
+    uint64_t assem_addr = 0, tag, set;
     int32_t cache_blk;
     uint8_t *blk_addr;
 
@@ -59,7 +59,7 @@ static MemTxResult __host_hcoh_access(CacheCommand cmd, PCIDevice *d,
             host_cache_print_data_block(hcache, set, cache_blk);
 
             // Write
-            rsp = cxl_remote_cxl_mem_write_with_cache(d, haddr, *(uint64_t *)blk_addr, HOST_BLKSIZE, attrs);
+            rsp = cxl_remote_cxl_mem_write_with_cache(d, haddr, blk_addr, HOST_BLKSIZE, attrs);
             if (rsp != MEMTX_OK) {
                 CXL_HCOH_BIAS(haddr, "cache miss -> write error -> haddr: 0x%lx", haddr);
                 return MEMTX_ERROR;

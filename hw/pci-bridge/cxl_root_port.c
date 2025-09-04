@@ -158,7 +158,7 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
         }
     }
 
-    memcpy(data, &cxl_backing_file_mmap[host_addr] - cxl_window_offset, CXL_MEM_ACCESS_UNIT);
+    memcpy(data, &cxl_backing_file_mmap[host_addr] - cxl_window_offset, size);
 
     char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
     int b, len;
@@ -233,21 +233,24 @@ uint64_t cxl_get_dest_cache(PCIDevice *d, hwaddr host_addr, MemTxAttrs attrs)
         cxl_mem_rw_buffer.last_access_time[cache_idx] =
             qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
         /* Bring the data from backend to the cache */
-        cxl_remote_cxl_mem_read(d, host_addr,
-                                &cxl_mem_rw_buffer.data[cache_idx][0],
-                                CXL_MEM_ACCESS_UNIT, attrs);
+        {
+            hwaddr aligned_addr = host_addr & ~((hwaddr)CXL_MEM_ACCESS_UNIT - 1);
+            cxl_remote_cxl_mem_read(d, aligned_addr,
+                                    &cxl_mem_rw_buffer.data[cache_idx][0],
+                                    CXL_MEM_ACCESS_UNIT, attrs);
+        }
     }
     return cache_idx;
 }
 
 MemTxResult cxl_remote_cxl_mem_write_with_cache(PCIDevice *d, hwaddr host_addr,
-                                                uint64_t data, unsigned size,
+                                                uint8_t *data, unsigned size,
                                                 MemTxAttrs attrs)
 {
     uint64_t cache_candidate = cxl_get_dest_cache(d, host_addr, attrs);
     memcpy(&cxl_mem_rw_buffer
                 .data[cache_candidate][host_addr & CXL_MEM_ACCESS_OFFSET_MASK],
-           &data, size);
+           data, size);
     return MEMTX_OK;
 }
 
@@ -264,7 +267,7 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
         }
     }
 
-    memcpy(&cxl_backing_file_mmap[host_addr] - cxl_window_offset, data, CXL_MEM_ACCESS_UNIT);
+    memcpy(&cxl_backing_file_mmap[host_addr] - cxl_window_offset, data, size);
 
     char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
     int b, len;
