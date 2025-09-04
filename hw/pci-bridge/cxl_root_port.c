@@ -115,12 +115,51 @@ MemTxResult cxl_remote_cxl_mem_read_with_cache(PCIDevice *d, hwaddr host_addr,
     return MEMTX_OK;
 }
 
+static char *cxl_backing_file_mmap = NULL;
+static const unsigned long cxl_window_offset = 0x290000000; // fw->base
+
+static int init_cxl_backing_file_mmap(void)
+{
+    size_t size = 1024 * 1024 * 1024;
+    int cxl_fd = open("cxl_dev.bin", O_RDWR | O_CREAT, 0644);
+    if (cxl_fd == -1) {
+        trace_cxl_root_debug_message("Failed to open CXL device");
+        return -1;
+    }
+
+    if (fallocate(cxl_fd, 0, 0, size) != 0) {
+        trace_cxl_root_debug_message("Failed to fallocate CXL backing file");
+        close(cxl_fd);
+        return -1;
+    }
+
+    cxl_backing_file_mmap = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, cxl_fd, 0);
+    close(cxl_fd);
+    if (cxl_backing_file_mmap == MAP_FAILED) {
+        cxl_backing_file_mmap = NULL;
+        trace_cxl_root_debug_message("Failed to mmap CXL backing file");
+        return -1;
+    }
+
+    return 0;
+}
+
 MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
                                     uint8_t *data, unsigned size,
                                     MemTxAttrs attrs)
 {
     trace_cxl_root_cxl_cxl_mem_read(host_addr);
 
+    if (cxl_backing_file_mmap == NULL) {
+        if (init_cxl_backing_file_mmap() == -1) {
+            trace_cxl_root_debug_message("Failed to init CXL backing file");
+            return MEMTX_ERROR;
+        }
+    }
+
+    memcpy(data, &cxl_backing_file_mmap[host_addr] - cxl_window_offset, CXL_MEM_ACCESS_UNIT);
+
+#if 0
     CXLRootPort *crp = CXL_ROOT_PORT(d);
 
     uint16_t tag;
@@ -141,6 +180,7 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
 
     *data = *(uint8_t *)(cxl_packet->data);
     release_packet_entry(tag);
+#endif
 
     return MEMTX_OK;
 }
@@ -208,6 +248,16 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
 {
     trace_cxl_root_cxl_cxl_mem_write(host_addr);
 
+    if (cxl_backing_file_mmap == NULL) {
+        if (init_cxl_backing_file_mmap() == -1) {
+            trace_cxl_root_debug_message("Failed to init CXL backing file");
+            return MEMTX_ERROR;
+        }
+    }
+
+    memcpy(&cxl_backing_file_mmap[host_addr] - cxl_window_offset, data, CXL_MEM_ACCESS_UNIT);
+
+#if 0
     CXLRootPort *crp = CXL_ROOT_PORT(d);
 
     uint16_t tag;
@@ -224,6 +274,7 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
         trace_cxl_root_debug_message("Failed to get CXL.mem MEM DATA response");
         return MEMTX_OK;
     }
+#endif
 
     return MEMTX_OK;
 }
