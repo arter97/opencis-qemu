@@ -36,7 +36,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
 
 #define CXL_ROOT_PORT_DID 0x7075
 
@@ -67,19 +66,6 @@ typedef struct CXLRootPort {
 #define TYPE_CXL_ROOT_PORT "cxl-rp"
 DECLARE_INSTANCE_CHECKER(CXLRootPort, CXL_ROOT_PORT, TYPE_CXL_ROOT_PORT)
 
-typedef struct cxl_mem_rw_buffer_struct {
-    hwaddr page_num[CXL_RW_NUM_BUFFERS];
-    uint64_t last_access_time[CXL_RW_NUM_BUFFERS];
-    uint8_t data[CXL_RW_NUM_BUFFERS][CXL_MEM_ACCESS_UNIT];
-    bool inited[CXL_RW_NUM_BUFFERS];
-} cxl_mem_rw_buffer_struct;
-
-static cxl_mem_rw_buffer_struct cxl_mem_rw_buffer = {
-    .page_num = { 0 },
-    .last_access_time = { 0 },
-    .inited = { 0 },
-};
-
 bool cxl_is_remote_root_port(PCIDevice *d)
 {
     if (!object_dynamic_cast(OBJECT(d), TYPE_CXL_ROOT_PORT)) {
@@ -102,18 +88,6 @@ PCIDevice *cxl_get_root_port(PCIDevice *d)
         bus = pci_get_bus(d);
     }
     return NULL;
-}
-
-MemTxResult cxl_remote_cxl_mem_read_with_cache(PCIDevice *d, hwaddr host_addr,
-                                               uint64_t *data, unsigned size,
-                                               MemTxAttrs attrs)
-{
-    uint64_t cache_candidate = cxl_get_dest_cache(d, host_addr, attrs);
-    memcpy(data,
-           &cxl_mem_rw_buffer
-                .data[cache_candidate][host_addr & CXL_MEM_ACCESS_OFFSET_MASK],
-           size);
-    return MEMTX_OK;
 }
 
 static char *cxl_backing_file_mmap = NULL;
@@ -146,7 +120,7 @@ static int init_cxl_backing_file_mmap(void)
 }
 
 MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
-                                    uint8_t *data, unsigned size,
+                                    uint64_t *data, unsigned size,
                                     MemTxAttrs attrs)
 {
     trace_cxl_root_cxl_cxl_mem_read(host_addr, size);
@@ -174,7 +148,7 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
     uint16_t tag;
     if (!send_cxl_mem_mem_read(crp->socket_fd, host_addr, &tag)) {
         trace_cxl_root_debug_message("Failed to send CXL.mem MEM RD request");
-        *data = 0xFF;
+        *data = 0xFFFFFFFF;
         return MEMTX_OK;
     }
 
@@ -183,74 +157,14 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
     if (cxl_packet == NULL) {
         release_packet_entry(tag);
         trace_cxl_root_debug_message("Failed to get CXL.mem MEM DATA response");
-        *data = 0xFF;
+        *data = 0xFFFFFFFF;
         return MEMTX_OK;
     }
 
-    *data = *(uint8_t *)(cxl_packet->data);
+    *data = *(uint64_t *)(cxl_packet->data);
     release_packet_entry(tag);
 #endif
 
-    return MEMTX_OK;
-}
-
-uint64_t cxl_get_dest_cache(PCIDevice *d, hwaddr host_addr, MemTxAttrs attrs)
-{
-    /* TODO: maybe a lock mechanism here? */
-    uint32_t cache_idx;
-    bool cache_hit = false;
-    uint64_t oldest_cache_ts = ULLONG_MAX;
-    int oldest_cache_candidate = -1;
-
-    for (cache_idx = 0; cache_idx < CXL_RW_NUM_BUFFERS; cache_idx++) {
-        if (!cxl_mem_rw_buffer.inited[cache_idx]) {
-            cxl_mem_rw_buffer.inited[cache_idx] = true;
-            cxl_mem_rw_buffer.page_num[cache_idx] = host_addr >> 6;
-        }
-        if (cxl_mem_rw_buffer.page_num[cache_idx] == host_addr >> 6) {
-            cache_hit = true;
-            cxl_mem_rw_buffer.last_access_time[cache_idx] =
-                qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
-            break;
-        }
-        if (cxl_mem_rw_buffer.last_access_time[cache_idx] < oldest_cache_ts) {
-            oldest_cache_ts = cxl_mem_rw_buffer.last_access_time[cache_idx];
-            oldest_cache_candidate = cache_idx;
-        }
-    }
-    if (!cache_hit) {
-        if (unlikely(oldest_cache_candidate == -1)) {
-            oldest_cache_candidate = 0;
-            trace_cxl_root_debug_message(
-                "unexpected: oldest_cache_candidate is -1\n");
-        }
-        /* Flush an existing cache to the backend */
-        cache_idx = oldest_cache_candidate;
-        cxl_remote_cxl_mem_write(d, cxl_mem_rw_buffer.page_num[cache_idx] << 6,
-                                 &cxl_mem_rw_buffer.data[cache_idx][0],
-                                 CXL_MEM_ACCESS_UNIT, attrs);
-        cxl_mem_rw_buffer.page_num[cache_idx] = host_addr >> 6;
-        cxl_mem_rw_buffer.last_access_time[cache_idx] =
-            qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL);
-        /* Bring the data from backend to the cache */
-        {
-            hwaddr aligned_addr = host_addr & ~((hwaddr)CXL_MEM_ACCESS_UNIT - 1);
-            cxl_remote_cxl_mem_read(d, aligned_addr,
-                                    &cxl_mem_rw_buffer.data[cache_idx][0],
-                                    CXL_MEM_ACCESS_UNIT, attrs);
-        }
-    }
-    return cache_idx;
-}
-
-MemTxResult cxl_remote_cxl_mem_write_with_cache(PCIDevice *d, hwaddr host_addr,
-                                                uint8_t *data, unsigned size,
-                                                MemTxAttrs attrs)
-{
-    uint64_t cache_candidate = cxl_get_dest_cache(d, host_addr, attrs);
-    memcpy(&cxl_mem_rw_buffer
-                .data[cache_candidate][host_addr & CXL_MEM_ACCESS_OFFSET_MASK],
-           data, size);
     return MEMTX_OK;
 }
 
@@ -281,8 +195,10 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
     CXLRootPort *crp = CXL_ROOT_PORT(d);
 
     uint16_t tag;
+    uint8_t data_bytes[CXL_MEM_ACCESS_UNIT];
+    *(uint64_t *)(data_bytes) = data;
 
-    if (!send_cxl_mem_mem_write(crp->socket_fd, host_addr, data, &tag)) {
+    if (!send_cxl_mem_mem_write(crp->socket_fd, host_addr, data_bytes, &tag)) {
         trace_cxl_root_debug_message("Failed to send CXL.mem MEM WR request");
         return MEMTX_OK;
     }
