@@ -20,6 +20,7 @@
 #include "qemu/osdep.h"
 #include "qemu/log.h"
 #include "qemu/range.h"
+#include "qemu/cutils.h"
 #include "hw/pci/pci_bridge.h"
 #include "hw/pci/pcie_port.h"
 #include "hw/pci/msi.h"
@@ -148,7 +149,7 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
                                     uint8_t *data, unsigned size,
                                     MemTxAttrs attrs)
 {
-    trace_cxl_root_cxl_cxl_mem_read(host_addr);
+    trace_cxl_root_cxl_cxl_mem_read(host_addr, size);
 
     if (cxl_backing_file_mmap == NULL) {
         if (init_cxl_backing_file_mmap() == -1) {
@@ -158,6 +159,14 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
     }
 
     memcpy(data, &cxl_backing_file_mmap[host_addr] - cxl_window_offset, CXL_MEM_ACCESS_UNIT);
+
+    char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
+    int b, len;
+    for (b = 0; b < size; b += 16) {
+        len = size - b;
+        qemu_hexdump_line(hexdump_buffer, b, data, len, true);
+        trace_cxl_root_cxl_cxl_mem_dump(hexdump_buffer);
+    }
 
 #if 0
     CXLRootPort *crp = CXL_ROOT_PORT(d);
@@ -246,7 +255,7 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
                                      uint8_t *data, unsigned size,
                                      MemTxAttrs attrs)
 {
-    trace_cxl_root_cxl_cxl_mem_write(host_addr);
+    trace_cxl_root_cxl_cxl_mem_write(host_addr, size);
 
     if (cxl_backing_file_mmap == NULL) {
         if (init_cxl_backing_file_mmap() == -1) {
@@ -256,6 +265,14 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
     }
 
     memcpy(&cxl_backing_file_mmap[host_addr] - cxl_window_offset, data, CXL_MEM_ACCESS_UNIT);
+
+    char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
+    int b, len;
+    for (b = 0; b < size; b += 16) {
+        len = size - b;
+        qemu_hexdump_line(hexdump_buffer, b, data, len, true);
+        trace_cxl_root_cxl_cxl_mem_dump(hexdump_buffer);
+    }
 
 #if 0
     CXLRootPort *crp = CXL_ROOT_PORT(d);
