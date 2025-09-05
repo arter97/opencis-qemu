@@ -120,7 +120,7 @@ static int init_cxl_backing_file_mmap(void)
 }
 
 MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
-                                    uint64_t *data, unsigned size,
+                                    void *data, unsigned size,
                                     MemTxAttrs attrs)
 {
     trace_cxl_root_cxl_cxl_mem_read(host_addr, size);
@@ -132,7 +132,7 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
         }
     }
 
-    memcpy(data, &cxl_backing_file_mmap[host_addr] - cxl_window_offset, size);
+    memcpy(data, cxl_backing_file_mmap + (host_addr - cxl_window_offset), size);
 
     char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
     int b, len;
@@ -169,7 +169,7 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
 }
 
 MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
-                                     uint8_t *data, unsigned size,
+                                     void *data, unsigned size,
                                      MemTxAttrs attrs)
 {
     trace_cxl_root_cxl_cxl_mem_write(host_addr, size);
@@ -181,7 +181,7 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
         }
     }
 
-    memcpy(&cxl_backing_file_mmap[host_addr] - cxl_window_offset, data, size);
+    memcpy(cxl_backing_file_mmap + (host_addr - cxl_window_offset), data, size);
 
     char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
     int b, len;

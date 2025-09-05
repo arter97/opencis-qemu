@@ -30,7 +30,7 @@ static MemTxResult __host_hcoh_access(CacheCommand cmd, PCIDevice *d,
     MemTxResult rsp;
     uint64_t assem_addr = 0, tag, set;
     int32_t cache_blk;
-    uint8_t *blk_addr;
+    uint8_t *cache_blk_data;
 
     tag = host_cache_extract_tag(hcache, haddr);
     set = host_cache_extract_set(hcache, haddr);
@@ -48,18 +48,18 @@ static MemTxResult __host_hcoh_access(CacheCommand cmd, PCIDevice *d,
 
         if (cache_blk == -1) {
             cache_blk = host_cache_find_replace_block(hcache, set);
-            blk_addr = host_cache_extract_block_addr(hcache, set, cache_blk);
+            cache_blk_data = host_cache_extract_block_addr(hcache, set, cache_blk);
 
             assem_addr = host_cache_assem_haddr(hcache, set, cache_blk);
 
             CXL_HCOH_BIAS(
                 assem_addr,
                 "cache miss -> vitctim write -> haddr: 0x%lx, data: 0x%lx",
-                assem_addr, *(uint64_t *)blk_addr);
+                assem_addr, *(uint64_t *)cache_blk_data);
             host_cache_print_data_block(hcache, set, cache_blk);
 
             // Write
-            rsp = cxl_remote_cxl_mem_write_with_cache(d, haddr, blk_addr, HOST_BLKSIZE, attrs);
+            rsp = cxl_remote_cxl_mem_write(d, haddr, cache_blk_data, HOST_BLKSIZE, attrs);
             if (rsp != MEMTX_OK) {
                 CXL_HCOH_BIAS(haddr, "cache miss -> write error -> haddr: 0x%lx", haddr);
                 return MEMTX_ERROR;
@@ -71,10 +71,10 @@ static MemTxResult __host_hcoh_access(CacheCommand cmd, PCIDevice *d,
 
         CXL_HCOH_BIAS(haddr, "cache miss -> read request -> haddr: 0x%lx",
                       haddr);
-        blk_addr = host_cache_extract_block_addr(hcache, set, cache_blk);
+        cache_blk_data = host_cache_extract_block_addr(hcache, set, cache_blk);
 
         // Read
-        rsp = cxl_remote_cxl_mem_read_with_cache(d, haddr, (uint64_t*)blk_addr, HOST_BLKSIZE, attrs);
+        rsp = cxl_remote_cxl_mem_read(d, haddr, cache_blk_data, HOST_BLKSIZE, attrs);
         if (rsp != MEMTX_OK) {
             CXL_HCOH_BIAS(haddr, "cache miss -> read error -> haddr: 0x%lx", haddr);
             return MEMTX_ERROR;
@@ -82,7 +82,7 @@ static MemTxResult __host_hcoh_access(CacheCommand cmd, PCIDevice *d,
 
         CXL_HCOH_BIAS(haddr,
                       "cache miss -> read done -> haddr: 0x%lx, data: 0x%lx",
-                      haddr, *(uint64_t *)blk_addr);
+                      haddr, *(uint64_t *)cache_blk_data);
         host_cache_print_data_block(hcache, set, cache_blk);
 
         cache_state = CACHE_EXCLUSIVE;
