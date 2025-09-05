@@ -22,7 +22,7 @@ cd ../build && ./qemu-system-x86_64 \
     --trace "vl_debug*" \
     --trace "pci_debug*" \
         -D debug.log \
-	-m 8G -smp 1 \
+	-m 4G,slots=4,maxmem=8G -smp 1 \
 	-machine type=q35,accel=kvm,cxl=on -nographic \
 	-hda /home/arter97/lab/opencis/images/ubuntu-noble1.qcow2 \
 	-D debug.log \
