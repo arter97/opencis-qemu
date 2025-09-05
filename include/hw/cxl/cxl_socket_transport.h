@@ -22,7 +22,7 @@ base_sideband_packet_t *wait_for_base_sideband_packet(int socket_fd);
 
 // CXL.mem
 
-bool send_cxl_mem_mem_write(int socket_fd, hwaddr hpa, uint8_t *data,
+bool send_cxl_mem_mem_write(int socket_fd, hwaddr hpa, void *data,
                             uint16_t *tag);
 bool send_cxl_mem_mem_read(int socket_fd, hwaddr hpa, uint16_t *tag);
 cxl_mem_s2m_ndr_packet_t *wait_for_cxl_mem_completion(int socket_fd,

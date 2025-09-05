@@ -125,6 +125,7 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
 {
     trace_cxl_root_cxl_cxl_mem_read(host_addr, size);
 
+#if 0
     if (cxl_backing_file_mmap == NULL) {
         if (init_cxl_backing_file_mmap() == -1) {
             trace_cxl_root_debug_message("Failed to init CXL backing file");
@@ -141,14 +142,13 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
         qemu_hexdump_line(hexdump_buffer, b, data, len, true);
         trace_cxl_root_cxl_cxl_mem_dump(hexdump_buffer);
     }
-
-#if 0
+#else
     CXLRootPort *crp = CXL_ROOT_PORT(d);
 
     uint16_t tag;
     if (!send_cxl_mem_mem_read(crp->socket_fd, host_addr, &tag)) {
         trace_cxl_root_debug_message("Failed to send CXL.mem MEM RD request");
-        *data = 0xFFFFFFFF;
+        memset(data, 0xFF, size);
         return MEMTX_OK;
     }
 
@@ -157,11 +157,11 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
     if (cxl_packet == NULL) {
         release_packet_entry(tag);
         trace_cxl_root_debug_message("Failed to get CXL.mem MEM DATA response");
-        *data = 0xFFFFFFFF;
+        memset(data, 0xFF, size);
         return MEMTX_OK;
     }
 
-    *data = *(uint64_t *)(cxl_packet->data);
+    memcpy(data, cxl_packet->data, size);
     release_packet_entry(tag);
 #endif
 
@@ -174,6 +174,7 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
 {
     trace_cxl_root_cxl_cxl_mem_write(host_addr, size);
 
+#if 0
     if (cxl_backing_file_mmap == NULL) {
         if (init_cxl_backing_file_mmap() == -1) {
             trace_cxl_root_debug_message("Failed to init CXL backing file");
@@ -190,15 +191,12 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
         qemu_hexdump_line(hexdump_buffer, b, data, len, true);
         trace_cxl_root_cxl_cxl_mem_dump(hexdump_buffer);
     }
-
-#if 0
+#else
     CXLRootPort *crp = CXL_ROOT_PORT(d);
 
     uint16_t tag;
-    uint8_t data_bytes[CXL_MEM_ACCESS_UNIT];
-    *(uint64_t *)(data_bytes) = data;
 
-    if (!send_cxl_mem_mem_write(crp->socket_fd, host_addr, data_bytes, &tag)) {
+    if (!send_cxl_mem_mem_write(crp->socket_fd, host_addr, data, &tag)) {
         trace_cxl_root_debug_message("Failed to send CXL.mem MEM WR request");
         return MEMTX_OK;
     }
