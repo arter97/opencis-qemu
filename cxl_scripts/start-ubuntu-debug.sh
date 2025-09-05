@@ -17,7 +17,6 @@ cd ../build && ./qemu-system-x86_64 \
     --trace "cxl_usp*" \
     --trace "cxl_debug*" \
     --trace "cxl_socket_cxl_io*" \
-    --trace "cxl_hcoh_bias*" \
     --trace "qdev_device*" \
     --trace "pc_debug*" \
     --trace "vl_debug*" \
