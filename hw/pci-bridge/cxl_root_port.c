@@ -158,7 +158,7 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
         }
     }
 
-    memcpy(data, &cxl_backing_file_mmap[host_addr] - cxl_window_offset, size);
+    memcpy(data, cxl_backing_file_mmap + (host_addr - cxl_window_offset), size);
 
     char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
     int b, len;
@@ -194,6 +194,8 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
     return MEMTX_OK;
 }
 
+static QemuMutex qemu_cxl_cache_lock;
+
 uint64_t cxl_get_dest_cache(PCIDevice *d, hwaddr host_addr, MemTxAttrs attrs)
 {
     /* TODO: maybe a lock mechanism here? */
@@ -201,6 +203,8 @@ uint64_t cxl_get_dest_cache(PCIDevice *d, hwaddr host_addr, MemTxAttrs attrs)
     bool cache_hit = false;
     uint64_t oldest_cache_ts = ULLONG_MAX;
     int oldest_cache_candidate = -1;
+
+    QEMU_LOCK_GUARD(&qemu_cxl_cache_lock);
 
     for (cache_idx = 0; cache_idx < CXL_RW_NUM_BUFFERS; cache_idx++) {
         if (!cxl_mem_rw_buffer.inited[cache_idx]) {
@@ -218,6 +222,7 @@ uint64_t cxl_get_dest_cache(PCIDevice *d, hwaddr host_addr, MemTxAttrs attrs)
             oldest_cache_candidate = cache_idx;
         }
     }
+
     if (!cache_hit) {
         if (unlikely(oldest_cache_candidate == -1)) {
             oldest_cache_candidate = 0;
@@ -238,6 +243,9 @@ uint64_t cxl_get_dest_cache(PCIDevice *d, hwaddr host_addr, MemTxAttrs attrs)
             cxl_remote_cxl_mem_read(d, aligned_addr,
                                     &cxl_mem_rw_buffer.data[cache_idx][0],
                                     CXL_MEM_ACCESS_UNIT, attrs);
+            // cxl_remote_cxl_mem_read(d, host_addr,
+            //                         &cxl_mem_rw_buffer.data[cache_idx][0],
+            //                         CXL_MEM_ACCESS_UNIT, attrs);
         }
     }
     return cache_idx;
@@ -248,8 +256,7 @@ MemTxResult cxl_remote_cxl_mem_write_with_cache(PCIDevice *d, hwaddr host_addr,
                                                 MemTxAttrs attrs)
 {
     uint64_t cache_candidate = cxl_get_dest_cache(d, host_addr, attrs);
-    memcpy(&cxl_mem_rw_buffer
-                .data[cache_candidate][host_addr & CXL_MEM_ACCESS_OFFSET_MASK],
+    memcpy(&cxl_mem_rw_buffer.data[cache_candidate][host_addr & CXL_MEM_ACCESS_OFFSET_MASK],
            data, size);
     return MEMTX_OK;
 }
@@ -267,7 +274,7 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
         }
     }
 
-    memcpy(&cxl_backing_file_mmap[host_addr] - cxl_window_offset, data, size);
+    memcpy(cxl_backing_file_mmap + (host_addr - cxl_window_offset), data, size);
 
     char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
     int b, len;
@@ -803,6 +810,7 @@ static const TypeInfo cxl_root_port_info = {
 
 static void cxl_register(void)
 {
+    qemu_mutex_init(&qemu_cxl_cache_lock);
     type_register_static(&cxl_root_port_info);
 }
 
