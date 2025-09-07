@@ -11,18 +11,10 @@ echo "SOCKET_HOST IS $SOCKET_HOST"
 #    --trace "kvm_guest_took*"
 
 cd ../build && ./qemu-system-x86_64 \
-    --trace "cxl_root*" \
-    --trace "cxl_read*" \
-    --trace "cxl_write*" \
-    --trace "cxl_usp*" \
-    --trace "cxl_debug*" \
-    --trace "cxl_socket_cxl_io*" \
-    --trace "qdev_device*" \
-    --trace "pc_debug*" \
-    --trace "vl_debug*" \
-    --trace "pci_debug*" \
+    --trace "cxl_root_cxl_cxl_mem*" \
+    --trace "kvm_guest_took*" \
         -D debug.log \
-	-m 8G -smp 1 \
+	-m 4G,slots=4,maxmem=8G -smp 1 \
 	-machine type=q35,accel=kvm,cxl=on -nographic \
 	-hda /home/arter97/lab/opencis/images/ubuntu-noble1.qcow2 \
 	-D debug.log \

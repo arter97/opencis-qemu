@@ -123,9 +123,9 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
                                     void *data, unsigned size,
                                     MemTxAttrs attrs)
 {
-    trace_cxl_root_cxl_cxl_mem_read(host_addr, size);
+    trace_cxl_root_cxl_cxl_mem_read(host_addr);
 
-#if 0
+#if 1
     if (cxl_backing_file_mmap == NULL) {
         if (init_cxl_backing_file_mmap() == -1) {
             trace_cxl_root_debug_message("Failed to init CXL backing file");
@@ -135,13 +135,13 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
 
     memcpy(data, cxl_backing_file_mmap + (host_addr - cxl_window_offset), size);
 
-    char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
-    int b, len;
-    for (b = 0; b < size; b += 16) {
-        len = size - b;
-        qemu_hexdump_line(hexdump_buffer, b, data, len, true);
-        trace_cxl_root_cxl_cxl_mem_dump(hexdump_buffer);
-    }
+    // char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
+    // int b, len;
+    // for (b = 0; b < size; b += 16) {
+    //     len = size - b;
+    //     qemu_hexdump_line(hexdump_buffer, b, data, len, true);
+    //     trace_cxl_root_cxl_cxl_mem_dump(hexdump_buffer);
+    // }
 #else
     CXLRootPort *crp = CXL_ROOT_PORT(d);
 
@@ -172,9 +172,9 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
                                      void *data, unsigned size,
                                      MemTxAttrs attrs)
 {
-    trace_cxl_root_cxl_cxl_mem_write(host_addr, size);
+    trace_cxl_root_cxl_cxl_mem_write(host_addr);
 
-#if 0
+#if 1
     if (cxl_backing_file_mmap == NULL) {
         if (init_cxl_backing_file_mmap() == -1) {
             trace_cxl_root_debug_message("Failed to init CXL backing file");
@@ -184,13 +184,13 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
 
     memcpy(cxl_backing_file_mmap + (host_addr - cxl_window_offset), data, size);
 
-    char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
-    int b, len;
-    for (b = 0; b < size; b += 16) {
-        len = size - b;
-        qemu_hexdump_line(hexdump_buffer, b, data, len, true);
-        trace_cxl_root_cxl_cxl_mem_dump(hexdump_buffer);
-    }
+    // char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
+    // int b, len;
+    // for (b = 0; b < size; b += 16) {
+    //     len = size - b;
+    //     qemu_hexdump_line(hexdump_buffer, b, data, len, true);
+    //     trace_cxl_root_cxl_cxl_mem_dump(hexdump_buffer);
+    // }
 #else
     CXLRootPort *crp = CXL_ROOT_PORT(d);
 

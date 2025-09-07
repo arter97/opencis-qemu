@@ -7,8 +7,8 @@ cxl_root_cxl_io_config_space_read0(uint8_t bus, uint8_t device, uint8_t function
 cxl_root_cxl_io_config_space_read1(uint8_t bus, uint8_t device, uint8_t function, uint32_t offset, int size) "CFG_RD1 [%02x:%02x.%d] @0x%03X[%dB]"
 cxl_root_cxl_io_mmio_write(uint64_t address, int size, uint64_t value) "MWR_64B @0x%"PRIx64"[%dB]: 0x%"PRIx64
 cxl_root_cxl_io_mmio_read(uint64_t address, int size) "MRD_64B @0x%"PRIx64"[%dB]"
-cxl_root_cxl_cxl_mem_write(uint64_t address, int size) "MEM_WR @0x%"PRIx64 "[%dB]"
-cxl_root_cxl_cxl_mem_read(uint64_t address, int size) "MEM_RD @0x%"PRIx64 "[%dB]"
+cxl_root_cxl_cxl_mem_write(uint64_t address) "0x%"PRIx64
+cxl_root_cxl_cxl_mem_read(uint64_t address) "0x%"PRIx64
 cxl_root_cxl_cxl_mem_dump(const char *dump) "MEM_DUMP: %s"
 
 # cxl_upstream_remote.c
