@@ -90,10 +90,10 @@ PCIDevice *cxl_get_root_port(PCIDevice *d)
     return NULL;
 }
 
-static char *cxl_backing_file_mmap = NULL;
-static const unsigned long cxl_window_offset = 0x290000000; // fw->base
+char *cxl_backing_file_mmap = NULL;
+const unsigned long cxl_window_offset = 0x290000000; // fw->base
 
-static int init_cxl_backing_file_mmap(void)
+int init_cxl_backing_file_mmap(void)
 {
     size_t size = 1024 * 1024 * 1024;
     int cxl_fd = open("cxl_dev.bin", O_RDWR | O_CREAT, 0644);
@@ -135,13 +135,13 @@ MemTxResult cxl_remote_cxl_mem_read(PCIDevice *d, hwaddr host_addr,
 
     memcpy(data, cxl_backing_file_mmap + (host_addr - cxl_window_offset), size);
 
-    // char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
-    // int b, len;
-    // for (b = 0; b < size; b += 16) {
-    //     len = size - b;
-    //     qemu_hexdump_line(hexdump_buffer, b, data, len, true);
-    //     trace_cxl_root_cxl_cxl_mem_dump(hexdump_buffer);
-    // }
+    char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
+    int b, len;
+    for (b = 0; b < size; b += 16) {
+        len = size - b;
+        qemu_hexdump_line(hexdump_buffer, b, data, len, true);
+        trace_cxl_root_cxl_cxl_mem_dump(hexdump_buffer);
+    }
 #else
     CXLRootPort *crp = CXL_ROOT_PORT(d);
 
@@ -184,13 +184,13 @@ MemTxResult cxl_remote_cxl_mem_write(PCIDevice *d, hwaddr host_addr,
 
     memcpy(cxl_backing_file_mmap + (host_addr - cxl_window_offset), data, size);
 
-    // char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
-    // int b, len;
-    // for (b = 0; b < size; b += 16) {
-    //     len = size - b;
-    //     qemu_hexdump_line(hexdump_buffer, b, data, len, true);
-    //     trace_cxl_root_cxl_cxl_mem_dump(hexdump_buffer);
-    // }
+    char hexdump_buffer[QEMU_HEXDUMP_LINE_LEN];
+    int b, len;
+    for (b = 0; b < size; b += 16) {
+        len = size - b;
+        qemu_hexdump_line(hexdump_buffer, b, data, len, true);
+        trace_cxl_root_cxl_cxl_mem_dump(hexdump_buffer);
+    }
 #else
     CXLRootPort *crp = CXL_ROOT_PORT(d);
 

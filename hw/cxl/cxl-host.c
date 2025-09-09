@@ -207,6 +207,9 @@ static PCIDevice *cxl_cfmws_find_device(CXLFixedWindow *fw, hwaddr addr)
     return NULL;
 }
 
+extern char *cxl_backing_file_mmap;
+extern int init_cxl_backing_file_mmap(void);
+
 static MemTxResult cxl_read_cfmws(void *opaque, hwaddr addr, uint64_t *data,
                                   unsigned size, MemTxAttrs attrs)
 {
@@ -224,8 +227,24 @@ static MemTxResult cxl_read_cfmws(void *opaque, hwaddr addr, uint64_t *data,
     }
 
     if (cxl_is_remote_root_port(d)) {
-        result = cxl_host_type3_hcoh_read(d, addr + fw->base, data, size, attrs);
+        if (cxl_backing_file_mmap == NULL) {
+            if (init_cxl_backing_file_mmap() == -1) {
+                return MEMTX_ERROR;
+            }
+        }
+
+        trace_cxl_debug_message("read memcpy++");
+        // memcpy(data, cxl_backing_file_mmap + addr, size);
+        uint64_t v = 0;
+        for (unsigned i = 0; i < size; ++i) {
+            v |= (uint64_t)cxl_backing_file_mmap[addr + i] << (8 * i);
+        }
+        *data = v;  // QEMU core will do any masking it needs, but v already zero-extended
+
+        trace_cxl_debug_message("read memcpy--");
+        result = MEMTX_OK;
         trace_cxl_read_cfmws("CXL.mem via RP", addr, size, *data);
+        // result = cxl_host_type3_hcoh_read(d, addr + fw->base, data, size, attrs);
     } else {
         type = object_get_typename(OBJECT(d));
         if (g_strcmp0(type, "cxl-type1") == 0)
@@ -260,8 +279,21 @@ static MemTxResult cxl_write_cfmws(void *opaque, hwaddr addr, uint64_t data,
     }
 
     if (cxl_is_remote_root_port(d)) {
+        if (cxl_backing_file_mmap == NULL) {
+            if (init_cxl_backing_file_mmap() == -1) {
+                return MEMTX_ERROR;
+            }
+        }
+
         trace_cxl_write_cfmws("CXL.mem via RP", addr, size, data);
-        result = cxl_host_type3_hcoh_write(d, addr + fw->base, data, size, attrs);
+        trace_cxl_debug_message("write memcpy++");
+        // memcpy(cxl_backing_file_mmap + addr, &data, size);
+        for (unsigned i = 0; i < size; ++i) {
+            cxl_backing_file_mmap[addr + i] = (uint8_t)(data >> (8 * i));
+        }
+        trace_cxl_debug_message("write memcpy--");
+        result = MEMTX_OK;
+        // result = cxl_host_type3_hcoh_write(d, addr + fw->base, data, size, attrs);
     } else {
         type = object_get_typename(OBJECT(d));
         if (g_strcmp0(type, "cxl-type1") == 0)

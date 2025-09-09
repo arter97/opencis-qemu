@@ -11,8 +11,10 @@ echo "SOCKET_HOST IS $SOCKET_HOST"
 #    --trace "kvm_guest_took*"
 
 cd ../build && ./qemu-system-x86_64 \
+    --trace "cxl_debug*" \
+    --trace "cxl_read*" \
+    --trace "cxl_write*" \
     --trace "cxl_root_cxl_cxl_mem*" \
-    --trace "kvm_guest_took*" \
         -D debug.log \
 	-m 4G,slots=4,maxmem=8G -smp 1 \
 	-machine type=q35,accel=kvm,cxl=on -nographic \
