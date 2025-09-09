@@ -2899,6 +2899,37 @@ static void kvm_eat_signals(CPUState *cpu)
     } while (sigismember(&chkset, SIG_IPI));
 }
 
+#include <sys/times.h>
+#include <sys/resource.h>
+
+// times
+// static uint64_t current_tick_in_ns(void)
+// {
+//     struct tms t;
+//     static long ticks_per_sec = 0;
+//     // struct rusage usage;
+
+//     if (ticks_per_sec == 0)
+//         ticks_per_sec = sysconf(_SC_CLK_TCK);
+
+//     times(&t);
+//     // getrusage(RUSAGE_SELF, &usage);
+
+//     clock_t user_ticks = t.tms_utime;
+//     clock_t system_ticks = t.tms_stime;
+//     clock_t total_ticks = user_ticks + system_ticks;
+
+//     return total_ticks * 1000000000LL / ticks_per_sec;
+// }
+
+// getrusage
+static uint64_t current_tick_in_ns(void)
+{
+    struct rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+    return usage.ru_utime.tv_sec * 1000000000LL + usage.ru_utime.tv_usec * 1000LL;
+}
+
 int kvm_cpu_exec(CPUState *cpu)
 {
     struct kvm_run *run = cpu->kvm_run;
@@ -2939,9 +2970,11 @@ int kvm_cpu_exec(CPUState *cpu)
          */
         smp_rmb();
 
-        start = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
+        // start = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
+        start = current_tick_in_ns();
         run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
-        end = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
+        end = current_tick_in_ns();
+        // end = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
         trace_kvm_guest_took(end - start);
 
         attrs = kvm_arch_post_run(cpu, run);
